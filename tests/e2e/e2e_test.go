@@ -16,6 +16,7 @@ package e2e
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -99,7 +100,32 @@ stringData:
 	portalManifest = strings.ReplaceAll(portalManifest, "imagePullPolicy: IfNotPresent", "imagePullPolicy: Never")
 	portalManifest = strings.ReplaceAll(portalManifest, "value: \"https://generativelanguage.googleapis.com\"", "value: \"http://backend\"")
 
+	// Install cert-manager
+	h.t.Log("Installing cert-manager")
+	h.RunCommand("kubectl", "apply", "--server-side", "-f", "https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml")
+	// Wait for cert-manager pods to be created
+	time.Sleep(10 * time.Second)
+	// Wait for cert-manager pods to be ready
+	h.WaitForPodReady("app.kubernetes.io/instance=cert-manager", 3*time.Minute)
+
 	h.KubectlApplyContent(portalManifest)
+	h.WaitForDeployment("service-portal", 2*time.Minute)
+
+	// Wait for CA secret to be created by cert-manager
+	h.t.Log("Waiting for CA secret")
+	for i := 0; i < 30; i++ {
+		cmd := exec.Command("kubectl", "get", "secret", "service-portal-ca")
+		if err := cmd.Run(); err == nil {
+			break
+		}
+		if i == 29 {
+			t.Fatal("Timed out waiting for service-portal-ca secret")
+		}
+		time.Sleep(2 * time.Second)
+	}
+
+	// Restart service-portal to ensure it picks up the CA secret (it might have started before the secret was created)
+	h.RunCommand("kubectl", "rollout", "restart", "deployment/service-portal")
 	h.WaitForDeployment("service-portal", 2*time.Minute)
 
 	// Run Client
@@ -118,7 +144,20 @@ spec:
   - name: toolbox
     image: toolbox:e2e
     imagePullPolicy: Never
-    command: ["/app/toolbox", "client", "http://service-portal"]
+    command: ["/app/toolbox", "client", "https://backend"]
+    env:
+    - name: HTTPS_PROXY
+      value: "http://service-portal"
+    - name: SSL_CERT_FILE
+      value: "/etc/ssl/certs/service-portal-ca.crt"
+    volumeMounts:
+    - name: ca-cert
+      mountPath: /etc/ssl/certs/service-portal-ca.crt
+      subPath: tls.crt
+  volumes:
+  - name: ca-cert
+    secret:
+      secretName: service-portal-ca
   restartPolicy: Never
 `
 	h.KubectlApplyContent(clientManifest)

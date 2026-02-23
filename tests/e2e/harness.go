@@ -113,7 +113,7 @@ func (h *Harness) WaitForDeployment(name string, timeout time.Duration) {
 func (h *Harness) WaitForPodReady(labelSelector string, timeout time.Duration) {
 	h.t.Helper()
 	h.t.Logf("Waiting for pod with label %s to be ready", labelSelector)
-	h.RunCommand("kubectl", "wait", "--for=condition=ready", "pod", "-l", labelSelector, "--timeout="+timeout.String())
+	h.RunCommand("kubectl", "wait", "--for=condition=ready", "pod", "-l", labelSelector, "-A", "--timeout="+timeout.String())
 }
 
 func (h *Harness) DeletePod(name string) {
