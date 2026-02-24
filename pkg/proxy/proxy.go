@@ -237,7 +237,7 @@ func (p *HTTPProxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 		}),
 	}
 
-	l := &oneShotListener{conn: tlsConn}
+	l := &connectionHandler{conn: tlsConn}
 	if err := server.Serve(l); err != nil && err != http.ErrServerClosed && err != io.EOF {
 		log.Printf("Serve failed: %v", err)
 	}
@@ -315,12 +315,12 @@ func (p *HTTPProxy) signCert(host string) (*tls.Certificate, error) {
 	return &cert, nil
 }
 
-type oneShotListener struct {
+type connectionHandler struct {
 	conn net.Conn
 	once sync.Once
 }
 
-func (l *oneShotListener) Accept() (net.Conn, error) {
+func (l *connectionHandler) Accept() (net.Conn, error) {
 	var c net.Conn
 	l.once.Do(func() {
 		c = l.conn
@@ -331,10 +331,10 @@ func (l *oneShotListener) Accept() (net.Conn, error) {
 	return c, nil
 }
 
-func (l *oneShotListener) Close() error {
+func (l *connectionHandler) Close() error {
 	return nil
 }
 
-func (l *oneShotListener) Addr() net.Addr {
+func (l *connectionHandler) Addr() net.Addr {
 	return l.conn.LocalAddr()
 }
