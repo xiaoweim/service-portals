@@ -27,14 +27,14 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o anthropic-portal ./anthropic-portal/cmd/anthropic-portal/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /anthropic-portal ./anthropic-portal/cmd/anthropic-portal/main.go
 
 # Use a minimal base image to package the application
 FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /
 
-COPY --from=builder /app/anthropic-portal /anthropic-portal
+COPY --from=builder /anthropic-portal /anthropic-portal
 
 # Run as non-root user
 USER 65532:65532
