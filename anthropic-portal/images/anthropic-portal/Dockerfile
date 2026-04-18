@@ -18,13 +18,13 @@ FROM golang:1.26 AS builder
 WORKDIR /app
 
 # Copy the Go module files
-COPY go.mod ./
+COPY ../../go.mod ./
 
 # Download the Go module dependencies
 RUN go mod download
 
 # Copy the source code
-COPY . .
+COPY ../../ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o anthropic-portal ./anthropic-portal/cmd/anthropic-portal/main.go
