@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-portal
+  labels:
+    app: gemini-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemini-portal
+  template:
+    metadata:
+      labels:
+        app: gemini-portal
+    spec:
+      containers:
+      - name: gemini-portal
+        image: gemini-portal:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: TARGET_URL
+          value: "https://generativelanguage.googleapis.com"
+        - name: UPSTREAM_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: gemini-portal-secret
+              key: token
+              optional: true
+        - name: UPSTREAM_AUTH_HEADER
+          value: "x-goog-api-key"
+        - name: CA_CERT_PATH
+          value: "/etc/gemini-portal/ca/tls.crt"
+        - name: CA_KEY_PATH
+          value: "/etc/gemini-portal/ca/tls.key"
+        volumeMounts:
+        - name: ca-cert
+          mountPath: /etc/gemini-portal/ca
+          readOnly: true
+      volumes:
+      - name: ca-cert
+        secret:
+          secretName: gemini-portal-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gemini-portal
+spec:
+  selector:
+    app: gemini-portal
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: gemini-portal-selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gemini-portal-ca
+spec:
+  isCA: true
+  commonName: gemini-portal-ca
+  secretName: gemini-portal-ca
+  issuerRef:
+    name: gemini-portal-selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: gemini-portal-issuer
+spec:
+  ca:
+    secretName: gemini-portal-ca
