@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anthropic-portal
+  labels:
+    app: anthropic-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: anthropic-portal
+  template:
+    metadata:
+      labels:
+        app: anthropic-portal
+    spec:
+      containers:
+      - name: anthropic-portal
+        image: anthropic-portal:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: TARGET_URL
+          value: "https://api.anthropic.com"
+        - name: UPSTREAM_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: anthropic-portal-secret
+              key: token
+              optional: true
+        - name: UPSTREAM_AUTH_HEADER
+          value: "x-api-key"
+        - name: CA_CERT_PATH
+          value: "/etc/anthropic-portal/ca/tls.crt"
+        - name: CA_KEY_PATH
+          value: "/etc/anthropic-portal/ca/tls.key"
+        volumeMounts:
+        - name: ca-cert
+          mountPath: /etc/anthropic-portal/ca
+          readOnly: true
+      volumes:
+      - name: ca-cert
+        secret:
+          secretName: anthropic-portal-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anthropic-portal
+spec:
+  selector:
+    app: anthropic-portal
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: anthropic-portal-selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: anthropic-portal-ca
+spec:
+  isCA: true
+  commonName: anthropic-portal-ca
+  secretName: anthropic-portal-ca
+  issuerRef:
+    name: anthropic-portal-selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: anthropic-portal-issuer
+spec:
+  ca:
+    secretName: anthropic-portal-ca
