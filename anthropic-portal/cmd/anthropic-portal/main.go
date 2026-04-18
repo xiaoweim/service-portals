@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gke-labs/service-portals/pkg/portals"
@@ -108,20 +110,31 @@ func (t *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		if err == nil {
 			resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
+			uncompressedBytes := bodyBytes
+			if strings.EqualFold(resp.Header.Get("Content-Encoding"), "gzip") {
+				gr, err := gzip.NewReader(bytes.NewReader(bodyBytes))
+				if err == nil {
+					if b, err := io.ReadAll(gr); err == nil {
+						uncompressedBytes = b
+					}
+					gr.Close()
+				}
+			}
+
 			var payload struct {
 				Content []struct {
 					Type string `json:"type"`
 					Text string `json:"text"`
 				} `json:"content"`
 			}
-			if err := json.Unmarshal(bodyBytes, &payload); err == nil && len(payload.Content) > 0 {
+			if err := json.Unmarshal(uncompressedBytes, &payload); err == nil && len(payload.Content) > 0 {
 				for _, c := range payload.Content {
 					if c.Type == "text" {
 						log.Printf("Parsed Response Content [text]: %s", c.Text)
 					}
 				}
 			} else {
-				log.Printf("Response Body: %s", string(bodyBytes))
+				log.Printf("Response Body: %s", string(uncompressedBytes))
 			}
 		}
 	}
