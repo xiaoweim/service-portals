@@ -39,7 +39,7 @@ func TestLoggingTransport(t *testing.T) {
 	req, _ := http.NewRequest("POST", ts.URL, nil)
 	// Avoid default transport auto-decompressing so we can test our logic
 	transport := &http.Transport{DisableCompression: true}
-	lt := &loggingTransport{underlying: transport}
+	lt := &loggingTransport{underlying: transport, targetHost: req.URL.Host}
 
 	resp, err := lt.RoundTrip(req)
 	if err != nil {
