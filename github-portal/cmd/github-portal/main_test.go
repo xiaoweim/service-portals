@@ -34,7 +34,7 @@ func TestLoggingTransport(t *testing.T) {
 	req, _ := http.NewRequest("GET", ts.URL, nil)
 	req.Header.Set("Authorization", "Bearer secret")
 	transport := &http.Transport{}
-	lt := &loggingTransport{underlying: transport, targetHost: req.URL.Host}
+	lt := &loggingTransport{underlying: transport}
 
 	resp, err := lt.RoundTrip(req)
 	if err != nil {

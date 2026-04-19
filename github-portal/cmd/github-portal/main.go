@@ -31,8 +31,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	targetURL := os.Getenv("TARGET_URL")
+	if targetURL == "" {
+		targetURL = "https://api.github.com/"
+	}
+
 	config := portals.Config{
-		DefaultTargetURL:  "https://api.github.com/",
+		DefaultTargetURL:  targetURL,
 		DefaultAuthHeader: "Authorization",
 		SetupProxy: func(p *proxy.HTTPProxy) {
 			p.Transport = &loggingTransport{
@@ -49,18 +54,12 @@ func main() {
 
 type loggingTransport struct {
 	underlying http.RoundTripper
-	targetHost string
 }
 
 func (t *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Host != "" && req.URL.Host != t.targetHost {
-		return t.underlying.RoundTrip(req)
-	}
-
 	log.Printf("--- GitHub Portal: Request Intercepted ---")
 	log.Printf("URL: %s", req.URL.String())
 	log.Printf("Method: %s", req.Method)
-
 	for k, v := range req.Header {
 		if k == "Authorization" {
 			log.Printf("Header %s: [REDACTED]", k)
