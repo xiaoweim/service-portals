@@ -54,13 +54,9 @@ func main() {
 
 type loggingTransport struct {
 	underlying http.RoundTripper
-	targetHost string
 }
 
 func (t *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Host != "" && req.URL.Host != t.targetHost {
-		return t.underlying.RoundTrip(req)
-	}
 	log.Printf("--- Anthropic Portal: Request Intercepted ---")
 	log.Printf("URL: %s", req.URL.String())
 	log.Printf("Method: %s", req.Method)
