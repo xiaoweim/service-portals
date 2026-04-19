@@ -1,0 +1,13 @@
+# service-portals
+
+Service Portals are simple HTTP/HTTPS proxy servers that run inside a Kubernetes cluster, and make it easier to consume services that run outside the cluster.
+
+## Installation from source
+
+To install or deploy this package from source, you should use the `ap` tool (https://raw.githubusercontent.com/gke-labs/gke-labs-infra/main/ap/llms.txt).
+
+The expected command to deploy everything from this project to the current kubernetes cluster is:
+
+```bash
+IMAGE_PREFIX=example.com/foo ap deploy //...
+```
