@@ -29,6 +29,8 @@ import (
 
 	"github.com/gke-labs/service-portals/pkg/portals"
 	"github.com/gke-labs/service-portals/pkg/proxy"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 
 	"cloud.google.com/go/ai/generativelanguage/apiv1/generativelanguagepb"
@@ -107,12 +109,7 @@ func logRequestBody(req *http.Request, bodyBytes []byte) {
 	contentType := req.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "application/json") {
 		var payload struct {
-			Contents []struct {
-				Role  string `json:"role"`
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"contents"`
+			Contents          []json.RawMessage `json:"contents"`
 			SystemInstruction struct {
 				Parts []struct {
 					Text string `json:"text"`
@@ -123,9 +120,11 @@ func logRequestBody(req *http.Request, bodyBytes []byte) {
 			if len(payload.SystemInstruction.Parts) > 0 {
 				log.Printf("Parsed Request System Prompt: %s", payload.SystemInstruction.Parts[0].Text)
 			}
-			for _, c := range payload.Contents {
-				for _, p := range c.Parts {
-					log.Printf("Parsed Request Message [%s]: %s", c.Role, p.Text)
+			unmarshaler := &protojson.UnmarshalOptions{DiscardUnknown: true}
+			for _, cBytes := range payload.Contents {
+				var c generativelanguagepb.Content
+				if err := unmarshaler.Unmarshal(cBytes, &c); err == nil {
+					log.Printf("Parsed Request Message [%s]: %s", c.GetRole(), prototext.Format(&c))
 				}
 			}
 		} else {
@@ -137,11 +136,7 @@ func logRequestBody(req *http.Request, bodyBytes []byte) {
 			var reqProto generativelanguagepb.GenerateContentRequest
 			if err := proto.Unmarshal(msgBytes, &reqProto); err == nil {
 				for _, c := range reqProto.GetContents() {
-					for _, p := range c.GetParts() {
-						if textPart, ok := p.Data.(*generativelanguagepb.Part_Text); ok {
-							log.Printf("Parsed GRPC Request Message [%s]: %s", c.GetRole(), textPart.Text)
-						}
-					}
+					log.Printf("Parsed GRPC Request Message [%s]: %s", c.GetRole(), prototext.Format(c))
 				}
 			} else {
 				log.Printf("Failed to unmarshal GRPC GenerateContentRequest: %v", err)
@@ -155,20 +150,12 @@ func logRequestBody(req *http.Request, bodyBytes []byte) {
 func logResponseBody(resp *http.Response, bodyBytes []byte) {
 	contentType := resp.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "application/json") {
-		var payload struct {
-			Candidates []struct {
-				Content struct {
-					Role  string `json:"role"`
-					Parts []struct {
-						Text string `json:"text"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-		if err := json.Unmarshal(bodyBytes, &payload); err == nil && len(payload.Candidates) > 0 {
-			for _, c := range payload.Candidates {
-				for _, p := range c.Content.Parts {
-					log.Printf("Parsed Response Content [%s]: %s", c.Content.Role, p.Text)
+		unmarshaler := &protojson.UnmarshalOptions{DiscardUnknown: true}
+		var respProto generativelanguagepb.GenerateContentResponse
+		if err := unmarshaler.Unmarshal(bodyBytes, &respProto); err == nil && len(respProto.GetCandidates()) > 0 {
+			for _, c := range respProto.GetCandidates() {
+				if c.Content != nil {
+					log.Printf("Parsed Response Content [%s]: %s", c.Content.GetRole(), prototext.Format(c.Content))
 				}
 			}
 		} else {
@@ -181,11 +168,7 @@ func logResponseBody(resp *http.Response, bodyBytes []byte) {
 			if err := proto.Unmarshal(msgBytes, &respProto); err == nil {
 				for _, c := range respProto.GetCandidates() {
 					if c.Content != nil {
-						for _, p := range c.Content.GetParts() {
-							if textPart, ok := p.Data.(*generativelanguagepb.Part_Text); ok {
-								log.Printf("Parsed GRPC Response Content [%s]: %s", c.Content.GetRole(), textPart.Text)
-							}
-						}
+						log.Printf("Parsed GRPC Response Content [%s]: %s", c.Content.GetRole(), prototext.Format(c.Content))
 					}
 				}
 			} else {
