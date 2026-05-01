@@ -148,8 +148,42 @@ func (p *HTTPProxy) proxyRequest(w http.ResponseWriter, r *http.Request, isMITM 
 		}
 	}
 
+	// Announce trailers
+	if len(resp.Trailer) > 0 {
+		var trailerKeys []string
+		for k := range resp.Trailer {
+			trailerKeys = append(trailerKeys, k)
+		}
+		w.Header().Set("Trailer", strings.Join(trailerKeys, ","))
+	}
+
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+
+	// Copy body and flush continuously
+	flusher, isFlusher := w.(http.Flusher)
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			w.Write(buf[:n])
+			if isFlusher {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			if err != io.EOF {
+				log.Printf("Error reading response body: %v", err)
+			}
+			break
+		}
+	}
+
+	// Copy trailers after body
+	for k, vv := range resp.Trailer {
+		for _, v := range vv {
+			w.Header().Add(k, v)
+		}
+	}
 
 	log.Printf("Proxied %s %s -> %s", r.Method, r.URL, resp.Status)
 }
