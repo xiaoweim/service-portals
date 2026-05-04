@@ -80,9 +80,18 @@ func Run(ctx context.Context, config Config) error {
 	}
 
 	if cacheTTL > 0 {
-		c := cache.NewInMemoryCache()
+		cleanupInterval := 1 * time.Minute
+		if cleanupEnv := os.Getenv("CACHE_CLEANUP_INTERVAL"); cleanupEnv != "" {
+			if d, err := time.ParseDuration(cleanupEnv); err == nil {
+				cleanupInterval = d
+			} else {
+				log.Printf("Warning: invalid CACHE_CLEANUP_INTERVAL %q: %v", cleanupEnv, err)
+			}
+		}
+
+		c := cache.NewInMemoryCache(cleanupInterval)
 		p.Transport = proxy.NewCachingTransport(c, p.Transport, cacheTTL)
-		log.Printf("Enabled caching with TTL %v", cacheTTL)
+		log.Printf("Enabled caching with TTL %v (cleanup interval %v)", cacheTTL, cleanupInterval)
 	}
 
 	if config.SetupProxy != nil {

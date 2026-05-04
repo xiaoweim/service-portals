@@ -27,7 +27,7 @@ import (
 
 func TestCachingTransport(t *testing.T) {
 	// Create a mock cache
-	memCache := cache.NewInMemoryCache()
+	memCache := cache.NewInMemoryCache(0)
 
 	// Create a mock upstream server
 	callCount := 0

@@ -21,7 +21,7 @@ import (
 )
 
 func TestInMemoryCache(t *testing.T) {
-	c := NewInMemoryCache()
+	c := NewInMemoryCache(0)
 
 	// Test Set and Get
 	c.Set("key1", []byte("value1"), 1*time.Minute)

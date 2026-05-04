@@ -33,14 +33,19 @@ type cacheItem struct {
 
 // InMemoryCache is an in-memory implementation of Cache.
 type InMemoryCache struct {
-	mu    sync.RWMutex
-	items map[string]cacheItem
+	mu              sync.RWMutex
+	items           map[string]cacheItem
+	cleanupInterval time.Duration
 }
 
 // NewInMemoryCache creates a new InMemoryCache and starts a background janitor to clean up expired items.
-func NewInMemoryCache() *InMemoryCache {
+func NewInMemoryCache(cleanupInterval time.Duration) *InMemoryCache {
+	if cleanupInterval <= 0 {
+		cleanupInterval = 1 * time.Minute
+	}
 	c := &InMemoryCache{
-		items: make(map[string]cacheItem),
+		items:           make(map[string]cacheItem),
+		cleanupInterval: cleanupInterval,
 	}
 	go c.janitor()
 	return c
@@ -83,7 +88,7 @@ func (c *InMemoryCache) Delete(key string) {
 }
 
 func (c *InMemoryCache) janitor() {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(c.cleanupInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
